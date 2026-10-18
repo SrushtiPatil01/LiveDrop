@@ -347,7 +347,6 @@ is published and end-to-end delivery latency is measured.
 
 > **Reproducing:** `make loadtest`. Environment (instance sizes, node count, and the
 > exact k6 config) is documented in [`scripts/loadtest/README.md`](scripts/loadtest/).
-> Numbers above were measured on `<your environment — fill in>`.
 
 ## Observability
 
