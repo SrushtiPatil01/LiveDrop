@@ -4,12 +4,6 @@
 
 **A real-time live-commerce backend that fans live inventory to thousands of viewers and never oversells under burst load.**
 
-[![Go](https://img.shields.io/badge/Go-1.22-00ADD8?logo=go&logoColor=white)](https://go.dev/)
-[![gRPC](https://img.shields.io/badge/gRPC-internal-244c5a?logo=grpc)](https://grpc.io/)
-[![Redis](https://img.shields.io/badge/Redis-hot%20path%20%2B%20pubsub-DC382D?logo=redis&logoColor=white)](https://redis.io/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-source%20of%20truth-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Terraform](https://img.shields.io/badge/Terraform-IaC-7B42BC?logo=terraform&logoColor=white)](https://www.terraform.io/)
-
 </div>
 
 ---
