@@ -1,0 +1,90 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-livedrop}
+      POSTGRES_USER: ${POSTGRES_USER:-livedrop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-livedrop}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build:
+      context: .
+      args:
+        TARGET: migrate
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ["tools"]
+
+  core:
+    build:
+      context: .
+      args:
+        TARGET: core
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://livedrop:livedrop@postgres:5432/livedrop?sslmode=disable}
+      REDIS_ADDR: redis:6379
+      REDIS_TLS: "false"
+      CORE_GRPC_ADDR: :9090
+      CORE_METRICS_ADDR: :9091
+    ports:
+      - "127.0.0.1:9090:9090"
+      - "127.0.0.1:9091:9091"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  edge:
+    build:
+      context: .
+      args:
+        TARGET: edge
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      REDIS_ADDR: redis:6379
+      REDIS_TLS: "false"
+      CORE_GRPC_TARGET: core:9090
+      EDGE_HTTP_ADDR: :8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      core:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  redis-data:

@@ -1,0 +1,226 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: livedrop-config
+data:
+  EDGE_HTTP_ADDR: ":8080"
+  CORE_GRPC_ADDR: ":9090"
+  CORE_GRPC_TARGET: "livedrop-core:9090"
+  CORE_METRICS_ADDR: ":9091"
+  RATE_LIMIT_RPS: "10"
+  RESERVE_TTL: "30"
+  REDIS_ADDR: "redis.example.internal:6379"
+  REDIS_TLS: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: livedrop-core
+  labels:
+    app: livedrop-core
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: livedrop-core
+  template:
+    metadata:
+      labels:
+        app: livedrop-core
+    spec:
+      containers:
+        - name: core
+          image: livedrop-core:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: grpc
+              containerPort: 9090
+            - name: metrics
+              containerPort: 9091
+          envFrom:
+            - configMapRef:
+                name: livedrop-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: livedrop-secrets
+                  key: database-url
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: livedrop-secrets
+                  key: redis-password
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: metrics
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: livedrop-core
+  labels:
+    app: livedrop-core
+spec:
+  type: ClusterIP
+  selector:
+    app: livedrop-core
+  ports:
+    - name: grpc
+      port: 9090
+      targetPort: grpc
+    - name: metrics
+      port: 9091
+      targetPort: metrics
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: livedrop-edge
+  labels:
+    app: livedrop-edge
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: livedrop-edge
+  template:
+    metadata:
+      labels:
+        app: livedrop-edge
+    spec:
+      containers:
+        - name: edge
+          image: livedrop-edge:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: livedrop-config
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: livedrop-secrets
+                  key: jwt-secret
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: livedrop-secrets
+                  key: redis-password
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: livedrop-edge
+  labels:
+    app: livedrop-edge
+spec:
+  type: ClusterIP
+  selector:
+    app: livedrop-edge
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: livedrop-edge
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: livedrop-edge
+  minReplicas: 2
+  maxReplicas: 30
+  metrics:
+    - type: External
+      external:
+        metric:
+          name: websocket_active_connections
+          selector:
+            matchLabels:
+              app: livedrop-edge
+        target:
+          type: AverageValue
+          averageValue: "1000"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: livedrop-core
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: livedrop-core
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: livedrop-core-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: livedrop-core
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: livedrop-edge
+      ports:
+        - protocol: TCP
+          port: 9090
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9091

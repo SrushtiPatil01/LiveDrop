@@ -1,0 +1,33 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: livedrop-edge
+  labels:
+    app.kubernetes.io/part-of: livedrop
+spec:
+  selector:
+    matchLabels:
+      app: livedrop-edge
+  targetLabels:
+    - app
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: livedrop-core
+  labels:
+    app.kubernetes.io/part-of: livedrop
+spec:
+  selector:
+    matchLabels:
+      app: livedrop-core
+  targetLabels:
+    - app
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s

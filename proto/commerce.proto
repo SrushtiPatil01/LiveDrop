@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package livedrop.commerce.v1;
+
+option go_package = "github.com/SrushtiPatil01/LiveDrop/proto;commercev1";
+
+service CommerceService {
+  rpc CreateShow(CreateShowRequest) returns (ShowState);
+  rpc AddProduct(AddProductRequest) returns (Product);
+  rpc GoLive(ShowRequest) returns (ShowState);
+  rpc PushProduct(PushProductRequest) returns (ShowState);
+  rpc StartSale(StartSaleRequest) returns (SaleState);
+  rpc PlaceOrder(PlaceOrderRequest) returns (PlaceOrderResponse);
+  rpc GetShowSnapshot(ShowRequest) returns (ShowSnapshot);
+}
+
+message CreateShowRequest {
+  string seller_id = 1;
+  string title = 2;
+}
+
+message AddProductRequest {
+  string seller_id = 1;
+  string show_id = 2;
+  string title = 3;
+  int64 price_cents = 4;
+  int64 total_stock = 5;
+}
+
+message ShowRequest {
+  string show_id = 1;
+  string seller_id = 2;
+}
+
+message PushProductRequest {
+  string seller_id = 1;
+  string show_id = 2;
+  string product_id = 3;
+}
+
+message StartSaleRequest {
+  string seller_id = 1;
+  string show_id = 2;
+  string product_id = 3;
+  string sale_type = 4;
+  int64 duration_seconds = 5;
+}
+
+message PlaceOrderRequest {
+  string buyer_id = 1;
+  string product_id = 2;
+  string idempotency_key = 3;
+  int64 quantity = 4;
+}
+
+message PlaceOrderResponse {
+  string order_id = 1;
+  string product_id = 2;
+  int64 quantity = 3;
+  int64 remaining_stock = 4;
+  bool replayed = 5;
+}
+
+message Product {
+  string id = 1;
+  string show_id = 2;
+  string title = 3;
+  int64 price_cents = 4;
+  int64 stock = 5;
+  int64 total_stock = 6;
+  int64 sold_count = 7;
+  bool on_stage = 8;
+}
+
+message ShowState {
+  string id = 1;
+  string seller_id = 2;
+  string title = 3;
+  string status = 4;
+  string current_product_id = 5;
+}
+
+message SaleState {
+  string show_id = 1;
+  string product_id = 2;
+  string sale_type = 3;
+  string ends_at = 4;
+}
+
+message ShowSnapshot {
+  ShowState show = 1;
+  repeated Product products = 2;
+  int64 viewers = 3;
+}
